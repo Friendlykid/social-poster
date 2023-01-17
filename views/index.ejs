@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imgur image upload</title>
+    <link rel="stylesheet" href="https://esotemp.vse.cz/~kouj13/public_style/style.css?ts=<?=time()?>" />
+    <link rel="icon" href="https://esotemp.vse.cz/~kouj13/public_style/favicon.ico" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+
+<body style="background: darkgrey">
+    <h1>Social poster</h1>
+    <h2>Welcome!</h2>
+    <h3>Choose on which social networks you want to upload your post</h3>
+    <div class="checkboxes">
+        <div class="checkboxClass">
+            <i class='fa fa-twitter' style='color: blue'></i>
+            <label for="twitter">Twitter</label>
+            <input type="checkbox" id="twitter" class="box">
+        </div>
+        <div class="checkboxClass">
+            <i class='fa fa-instagram' style='color: red'></i>
+            <label for="instagram">Instagram</label>
+            <input type="checkbox" id="instagram" class="box">
+        </div>
+        <div class="checkboxClass" >
+            <i class='fa fa-reddit' style='color: red'></i>
+            <label for="reddit">Reddit</label>
+            <input type="checkbox" id="reddit" class="box">
+        </div>
+        <div class="checkboxClass" onclick="showSelectImage()">
+            <img src="https://esotemp.vse.cz/~kouj13/public_style/imgur_logo.png" alt="logoImgur" style="height: 16px">
+            <label for="imgur">Imgur</label>
+            <input type="checkbox" id="imgur" class="box">
+        </div>
+
+    </div>
+    <div class="title" id="title">
+        <h3>Headline</h3>
+        <div class="center">
+            <label for="textBoxTitle"></label>
+            <input type="text" id="textBoxTitle" placeholder="Only for Reddit" class="textboxTitle" maxlength="300">
+        </div>
+    </div>
+    <div class="subreddit" id="subreddit">
+        <h3>Subreddit</h3>
+        <div class="center">
+            <label for="textBoxSubreddit"></label>
+            <input type="text" id="textBoxSubreddit" placeholder="Only for Reddit" class="textboxTitle">
+        </div>
+    </div>
+
+    <h3>Text of post</h3>
+    <div class="center">
+        <label for="textBox"></label>
+        <textarea id="textBox" placeholder="Write something..." class="textbox" style="resize: none;" maxlength="280"></textarea>
+    </div>
+    <label for="image" class="inputImage" id="imageLabel">Select Image</label>
+    <input type="file" style="display: none" accept="image/*" id="image" placeholder="Image">
+    <br>
+    <button class="buttonUpload" id="buttonUpload" onclick="uploadPosts()">Upload</button>
+    <div class="center" id="url"></div>
+    <script>
+
+        function showSelectImage(){
+            if(document.getElementById('imageLabel').style.visibility !== 'visible'){
+                document.getElementById('imageLabel').style.visibility = 'visible';
+
+            } else{
+                document.getElementById('imageLabel').style.visibility = 'hidden';
+                document.getElementById('image').value = '';
+            }
+        }
+        // klik na výběr
+        document.querySelectorAll(".checkboxClass").forEach(checkboxContainer => {
+            checkboxContainer.addEventListener('click', (e) => {
+                let box = checkboxContainer.getElementsByClassName("box")[0];
+                box.checked = !box.checked;
+                if(box.checked){
+                    checkboxContainer.style.backgroundColor = "#2d63c8";
+                }
+                else {
+                    checkboxContainer.style.backgroundColor = "#ffffff";
+                }
+                //podmínky pro nadpis
+                if(box.id === "reddit" && box.checked){
+                    document.getElementById('title').style.visibility = 'visible';
+                    document.getElementById('subreddit').style.visibility = 'visible';
+                }
+                if(box.id === "reddit" && !box.checked){
+                    document.getElementById('title').style.visibility = 'hidden';
+                    document.getElementById('subreddit').style.visibility = 'hidden';
+                    document.getElementById('textBoxTitle').value = "";
+                    document.getElementById('textBoxSubreddit').value = "";
+                }
+
+                // je potřeba, jinak se event spouští dvakrát
+                e.stopPropagation();
+                e.preventDefault();
+            })
+        });
+
+        function fillFormData(formData) {
+            if(document.getElementById('textBoxTitle').value){
+                formData.append('title',document.getElementById('textBoxTitle').value);
+            }
+            if(document.getElementById('textBoxSubreddit').value){
+                formData.append( 'subreddit', document.getElementById('textBoxSubreddit').value);
+            }
+            if(document.getElementById('textBox').value){
+                formData.append('textPost', document.getElementById('textBox').value);
+            }
+            if(document.getElementById('image').files[0]){
+                formData.append('image',document.getElementById('image').files[0]);
+            }
+        }
+
+        /**
+         *
+         * @returns true when no social Media is selected, otherwise false
+         */
+        function noSocialMediaIsChecked() {
+            let res = true;
+            document.querySelectorAll(".box").forEach( box =>{
+                if(box.checked){
+                    res = false;
+                }
+            });
+            return res;
+        }
+
+        //klik na upload
+        function uploadPosts(){
+            let formData = new FormData;
+            document.querySelectorAll(".checkboxClass").forEach(checkboxContainer => {
+                if(checkboxContainer.getElementsByClassName("box")[0].checked){
+                    formData.append(
+                        checkboxContainer.getElementsByClassName("box")[0].getAttribute("id"),
+                        checkboxContainer.getElementsByClassName("box")[0].getAttribute("id")
+                    );
+                }
+            })
+            if(noSocialMediaIsChecked()){
+                alert('You need to choose at least one social network!');
+            }else{
+                fillFormData(formData);
+                //TODO: změnit až bude online
+                fetch('http://localhost:3000/submit-form', {
+                    method: 'POST',
+                    body: formData
+                });
+            }
+
+        }
+    </script>
+</body>
+
+</html>
