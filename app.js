@@ -180,10 +180,6 @@ async function promiseTwitter(req){
         .catch(error => console.log('error', error));
 }
 
-async function promiseInstagram(req) {
-
-}
-
 /*  Jestli jsou sociální sítě vybrány pošle se jejich jméno do req.body.<NÁZEV SOCIÁLNÍ SÍTĚ>
     req.body.title je title příspěvku
     req.body.subreddit je jméno subreditu
@@ -191,10 +187,9 @@ async function promiseInstagram(req) {
     req.files.image je obrázek
 */
 app.post('/submit-form', (req,res) => {
-    //TODO when finished remove comment
-    Promise.all([promiseImgur(req),promiseReddit(req), promiseTwitter(req)/*, promiseInstagram(req)*/])
-        .then(([imgurData, redditData, TwitterData, instagramData]) =>{
-            //TODO
+    Promise.all([promiseImgur(req),promiseReddit(req), promiseTwitter(req)])
+        .then(([imgurData, redditData, twitterData]) =>{
+            res.render('uploaded.ejs', {imgurLink: imgurData, redditLink: redditData, twitterLink: twitterData});
         })
     if(!req.files){
         return res.status(400).send('Nothing was uploaded');
