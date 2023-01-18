@@ -147,7 +147,6 @@
                 alert('You need to choose at least one social network!');
             }else{
                 fillFormData(formData);
-                //TODO: změnit až bude online
                 fetch('http://localhost:3000/submit-form', {
                     method: 'POST',
                     body: formData
