@@ -4,6 +4,7 @@ const app = express();
 const fileUpload = require('express-fileupload');
 require('dotenv').config();
 require('ejs')
+const {Readable} = require("stream");
 let image;
 let imagePath;
 
@@ -26,9 +27,7 @@ app.get("/", (req, res) => res.type('html').send(file));
  */
 async function promiseImgur(req) {
     const { ImgurClient } = require('imgur');
-
     const client = new ImgurClient({ clientId: process.env.IMGUR_CLIENT_ID });
-
     if(req.body.imgur && !req.files  ){
         console.log('The user did not entered a file');
         return Promise.resolve('The user did not entered a file');
@@ -36,24 +35,20 @@ async function promiseImgur(req) {
     if(!req.body.imgur){
         return Promise.resolve(undefined);
     }
-    return new Promise((resolve, reject) => {
+
+    const buffer = req.files.image.data;
+    const stream = Readable.from(buffer);
+    return new Promise((resolve) => {
         image = req.files.image;
         imagePath = __dirname + '/uploads/' + image.name;
-        image.mv(imagePath, async function (err) {
-            if (err) {
-                return reject(err);
-            }
-            try {
-                const response = await client.upload({
-                    image: fs.createReadStream(imagePath),
+                client.upload({
+                    image: stream,
                     type: "stream"
+                }).then(response =>{
+                    console.log('Imgur link: '+response.data.link)
+                    resolve(response.data.link);
                 });
-                console.log('Imgur link: '+response.data.link)
-                resolve(response.data.link);
-            } catch (error) {
-                reject(error);
-            }
-        });
+
     });
 }
 
@@ -126,9 +121,7 @@ async function promiseTwitter(req){
     if (!req.body.textPost && !req.files) {
         return Promise.resolve(undefined);
     }
-    if (!req.body.textPost && req.files) {
-        return Promise.resolve('You have to enter a text');
-    }
+
     const Twit = require('twit');
     const T = new Twit({
         consumer_key:         process.env.TWITTER_API_KEY,
@@ -139,57 +132,14 @@ async function promiseTwitter(req){
         strictSSL:            true,     // optional - requires SSL certificates to be valid.
     })
 
-    if(!req.files) {
-        return new Promise((resolve) => {
-            T.post('statuses/update', {status: req.body.textPost}, function (err, data) {
-                console.log(createTwitterLink(data.id_str));
-                resolve(createTwitterLink(data.id_str));
-            });
-        })
-    }
-    //At this point we know that the user wants to post an image with a text
-    return new Promise((resolve, reject) =>{
-        image = req.files.image;
-        imagePath = __dirname + '/uploads/' + image.name;
-        image.mv(imagePath, async function (err) {
-            if (err) {
-                console.log(err);
-                return reject(err);
-            }
-            const b64content = fs.readFileSync(imagePath, { encoding: 'base64' });
-            // first we must post the media to Twitter
-            T.post('media/upload', { media_data: b64content }, function (err, data) {
-                // now we can assign alt text to the media, for use by screen readers and
-                // other text-based presentations and interpreters
-                const mediaIdStr = data.media_id_string;
-                const meta_params = {media_id: mediaIdStr, alt_text: {text: req.body.textPost}};
-                T.post('media/metadata/create', meta_params, function (err) {
-                    if (!err) {
-                        // now we can reference the media and post a tweet (media will attach to the tweet)
-                        let status = req.body.textPost;
-                        if(!req.body.textPost)
-                            status = ' ';
-                        const params = { status: status, media_ids: [mediaIdStr] }
-
-                        T.post('statuses/update', params, function (err, data) {
-                            console.log(createTwitterLink(data.id_str));
-                            resolve(createTwitterLink(data.id_str));
-                        })
-                    }
-                })
-            })
-        })
+    return new Promise((resolve) => {
+        T.post('statuses/update', {status: req.body.textPost}, function (err, data) {
+            console.log(createTwitterLink(data.id_str));
+            resolve(createTwitterLink(data.id_str));
+        });
     })
 }
 
-function deleteImageFromServer(image) {
-    try{
-        fs.unlinkSync(imagePath = __dirname + '/uploads/' + image.name);
-    }catch (e){
-        console.log(e);
-    }
-
-}
 
 /*  If is website chosen its name will appear in req.body.<NAME OF WEBSITE>
     req.body.title is title
@@ -200,9 +150,6 @@ function deleteImageFromServer(image) {
 app.post('/submit-form', (req,res) => {
     Promise.all([promiseImgur(req),promiseReddit(req), promiseTwitter(req)])
         .then(([imgurData, redditData, twitterData]) =>{
-            if(req.files){
-                deleteImageFromServer(req.files.image);
-            }
             let body = {};
             if(twitterData)
                 body.twitterLink = twitterData;
