@@ -16,9 +16,192 @@ app.set('views', 'views');
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.render('index.ejs');
-});
+const html = '<!DOCTYPE html>\n' +
+    '<html lang="en">\n' +
+    '\n' +
+    '<head>\n' +
+    '    <meta charset="utf-8">\n' +
+    '    <meta http-equiv="X-UA-Compatible" content="IE=edge">\n' +
+    '    <meta name="viewport" content="width=device-width, initial-scale=1">\n' +
+    '    <title>Imgur image upload</title>\n' +
+    '    <link rel="stylesheet" href="https://esotemp.vse.cz/~kouj13/public_style/style.css?ts=<?=time()?>" />\n' +
+    '    <link rel="icon" href="https://esotemp.vse.cz/~kouj13/public_style/favicon.ico" />\n' +
+    '    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">\n' +
+    '</head>\n' +
+    '\n' +
+    '<body style="background: darkgrey">\n' +
+    '    <h1>Social poster</h1>\n' +
+    '    <h2>Choose on which social networks you want to upload your post</h2>\n' +
+    '    <div class="checkboxes">\n' +
+    '        <div class="checkboxClass">\n' +
+    '            <i class=\'fa fa-twitter\' style=\'color: blue\' ></i>\n' +
+    '            <label for="twitter">Twitter</label>\n' +
+    '            <input type="checkbox" id="twitter" class="box">\n' +
+    '        </div>\n' +
+    '        <div class="checkboxClass" >\n' +
+    '            <i class=\'fa fa-reddit\' style=\'color: red\'></i>\n' +
+    '            <label for="reddit">Reddit</label>\n' +
+    '            <input type="checkbox" id="reddit" class="box">\n' +
+    '        </div>\n' +
+    '        <div class="checkboxClass" >\n' +
+    '            <img src="https://esotemp.vse.cz/~kouj13/public_style/imgur_logo.png" alt="logoImgur" style="height: 16px">\n' +
+    '            <label for="imgur">Imgur</label>\n' +
+    '            <input type="checkbox" id="imgur" class="box">\n' +
+    '        </div>\n' +
+    '\n' +
+    '    </div>\n' +
+    '    <div class="title" id="title">\n' +
+    '        <h3>Headline</h3>\n' +
+    '        <div class="center">\n' +
+    '            <label for="textBoxTitle"></label>\n' +
+    '            <input type="text" id="textBoxTitle" placeholder="Only for Reddit" class="textboxTitle" maxlength="300">\n' +
+    '        </div>\n' +
+    '    </div>\n' +
+    '    <div class="subreddit" id="subreddit">\n' +
+    '        <h3>Subreddit</h3>\n' +
+    '        <div class="center">\n' +
+    '            <label for="textBoxSubreddit"></label>\n' +
+    '            <input type="text" id="textBoxSubreddit" placeholder="Only for Reddit" class="textboxTitle">\n' +
+    '        </div>\n' +
+    '    </div>\n' +
+    '\n' +
+    '    <h3>Text of post</h3>\n' +
+    '    <div class="center">\n' +
+    '        <label for="textBox"></label>\n' +
+    '        <textarea id="textBox" placeholder="Write something..." class="textbox" style="resize: none;" maxlength="280"></textarea>\n' +
+    '    </div>\n' +
+    '    <label for="image" class="inputImage" id="imageLabel">Select Image</label>\n' +
+    '    <input type="file" style="display: none" accept="image/*" id="image" placeholder="Image">\n' +
+    '    <br>\n' +
+    '    <button class="buttonUpload" id="buttonUpload" onclick="uploadPosts()">Upload</button>\n' +
+    '    <div class="center" id="url">\n' +
+    '        <p>Imgur link: <a id="imgurLink" style="visibility: hidden" target="_blank"></a></p>\n' +
+    '        <p>Reddit link:<a id="redditLink" style="visibility: hidden" target="_blank"></a></p>\n' +
+    '        <p>Twitter link:<a id="twitterLink" style="visibility: hidden" target="_blank"></a></p>\n' +
+    '    </div>\n' +
+    '    <script>\n' +
+    '\n' +
+    '        function imageInputClick(){\n' +
+    '            if(document.getElementById(\'imgur\').checked || document.getElementById(\'twitter\').checked ){\n' +
+    '                document.getElementById(\'imageLabel\').style.visibility = \'visible\';\n' +
+    '            } else{\n' +
+    '                document.getElementById(\'imageLabel\').style.visibility = \'hidden\';\n' +
+    '                document.getElementById(\'image\').value = \'\';\n' +
+    '            }\n' +
+    '        }\n' +
+    '        // klik na výběr\n' +
+    '        document.querySelectorAll(".checkboxClass").forEach(checkboxContainer => {\n' +
+    '            checkboxContainer.addEventListener(\'click\', (e) => {\n' +
+    '                let box = checkboxContainer.getElementsByClassName("box")[0];\n' +
+    '                box.checked = !box.checked;\n' +
+    '                if(box.id === \'twitter\' || box.id === \'imgur\'){\n' +
+    '                    imageInputClick();\n' +
+    '                }\n' +
+    '                if(box.checked){\n' +
+    '                    checkboxContainer.style.backgroundColor = "#2d63c8";\n' +
+    '                }\n' +
+    '                else {\n' +
+    '                    checkboxContainer.style.backgroundColor = "#ffffff";\n' +
+    '                }\n' +
+    '                //podmínky pro nadpis\n' +
+    '                if(box.id === "reddit" && box.checked){\n' +
+    '                    document.getElementById(\'title\').style.visibility = \'visible\';\n' +
+    '                    document.getElementById(\'subreddit\').style.visibility = \'visible\';\n' +
+    '                }\n' +
+    '                if(box.id === "reddit" && !box.checked){\n' +
+    '                    document.getElementById(\'title\').style.visibility = \'hidden\';\n' +
+    '                    document.getElementById(\'subreddit\').style.visibility = \'hidden\';\n' +
+    '                    document.getElementById(\'textBoxTitle\').value = "";\n' +
+    '                    document.getElementById(\'textBoxSubreddit\').value = "";\n' +
+    '                }\n' +
+    '\n' +
+    '                // je potřeba, jinak se event spouští dvakrát\n' +
+    '                e.stopPropagation();\n' +
+    '                e.preventDefault();\n' +
+    '            })\n' +
+    '        });\n' +
+    '\n' +
+    '        function fillFormData(formData) {\n' +
+    '            if(document.getElementById(\'textBoxTitle\').value){\n' +
+    '                formData.append(\'title\',document.getElementById(\'textBoxTitle\').value);\n' +
+    '            }\n' +
+    '            if(document.getElementById(\'textBoxSubreddit\').value){\n' +
+    '                formData.append( \'subreddit\', document.getElementById(\'textBoxSubreddit\').value);\n' +
+    '            }\n' +
+    '            if(document.getElementById(\'textBox\').value){\n' +
+    '                formData.append(\'textPost\', document.getElementById(\'textBox\').value);\n' +
+    '            }\n' +
+    '            if(document.getElementById(\'image\').files[0]){\n' +
+    '                formData.append(\'image\',document.getElementById(\'image\').files[0]);\n' +
+    '            }\n' +
+    '        }\n' +
+    '\n' +
+    '        /**\n' +
+    '         *\n' +
+    '         * @returns true when no social Media is selected, otherwise false\n' +
+    '         */\n' +
+    '        function noSocialMediaIsChecked() {\n' +
+    '            let res = true;\n' +
+    '            document.querySelectorAll(".box").forEach( box =>{\n' +
+    '                if(box.checked){\n' +
+    '                    res = false;\n' +
+    '                }\n' +
+    '            });\n' +
+    '            return res;\n' +
+    '        }\n' +
+    '\n' +
+    '        //klik na upload\n' +
+    '        function uploadPosts(){\n' +
+    '            let formData = new FormData;\n' +
+    '            document.querySelectorAll(".checkboxClass").forEach(checkboxContainer => {\n' +
+    '                if(checkboxContainer.getElementsByClassName("box")[0].checked){\n' +
+    '                    formData.append(\n' +
+    '                        checkboxContainer.getElementsByClassName("box")[0].getAttribute("id"),\n' +
+    '                        checkboxContainer.getElementsByClassName("box")[0].getAttribute("id")\n' +
+    '                    );\n' +
+    '                }\n' +
+    '            })\n' +
+    '            if(noSocialMediaIsChecked()){\n' +
+    '                alert(\'You need to choose at least one social network!\');\n' +
+    '            }else{\n' +
+    '                fillFormData(formData);\n' +
+    '                fetch(\'http://localhost:3000/submit-form\', {\n' +
+    '                    method: \'POST\',\n' +
+    '                    body: formData\n' +
+    '                }).then(res => {\n' +
+    '                    if(res.ok) {\n' +
+    '                        return res.json();\n' +
+    '                    }\n' +
+    '                    else {\n' +
+    '                        throw new Error(\'Server responded with status: \' + res.status);\n' +
+    '                    }\n' +
+    '                })\n' +
+    '                    .then(data => {\n' +
+    '                        console.log(data);\n' +
+    '                        if(data.imgurLink){\n' +
+    '                            document.getElementById(\'imgurLink\').style.visibility = \'visible\';\n' +
+    '                            document.getElementById(\'imgurLink\').innerHTML = data.imgurLink;\n' +
+    '                            document.getElementById(\'imgurLink\').href = data.imgurLink;\n' +
+    '                        }\n' +
+    '                        if(data.redditLink){\n' +
+    '                            document.getElementById(\'redditLink\').style.visibility = \'visible\';\n' +
+    '                            document.getElementById(\'redditLink\').innerHTML = data.redditLink;\n' +
+    '                            document.getElementById(\'redditLink\').href = data.redditLink;\n' +
+    '                        }\n' +
+    '                        if(data.twitterLink){\n' +
+    '                            document.getElementById(\'twitterLink\').style.visibility = \'visible\';\n' +
+    '                            document.getElementById(\'twitterLink\').innerHTML = data.twitterLink;\n' +
+    '                            document.getElementById(\'twitterLink\').href = data.twitterLink;\n' +
+    '                        }\n' +
+    '                    })\n' +
+    '            }\n' +
+    '\n' +
+    '        }\n' +
+    '    </script>\n' +
+    '</body>\n' +
+    '\n' +
+    '</html>'
+app.get("/", (req, res) => res.type('html').send(html));
 
 
 /**
