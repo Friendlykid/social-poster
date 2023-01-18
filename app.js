@@ -165,7 +165,7 @@ const html = '<!DOCTYPE html>\n' +
     '                alert(\'You need to choose at least one social network!\');\n' +
     '            }else{\n' +
     '                fillFormData(formData);\n' +
-    '                fetch(\'http://localhost:3000/submit-form\', {\n' +
+    '                fetch(\'https://social-poster.onrender.com/submit-form\', {\n' +
     '                    method: \'POST\',\n' +
     '                    body: formData\n' +
     '                }).then(res => {\n' +

@@ -147,7 +147,7 @@
                 alert('You need to choose at least one social network!');
             }else{
                 fillFormData(formData);
-                fetch('http://localhost:3000/submit-form', {
+                fetch('https://social-poster.onrender.com/submit-form', {
                     method: 'POST',
                     body: formData
                 }).then(res => {
