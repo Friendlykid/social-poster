@@ -4,16 +4,9 @@ const express = require('express');
 const app = express();
 const fileUpload = require('express-fileupload');
 require('dotenv').config();
+require('ejs')
 let image;
 let imagePath;
-
-//Imgur věci
-const { ImgurClient } = require('imgur');
-const client = new ImgurClient({ clientId: process.env.IMGUR_CLIENT_ID });
-let imgurImageLink;
-
-
-
 
 app.use(fileUpload());
 
@@ -27,33 +20,6 @@ app.get('/', (req, res) => {
     res.render('index.ejs');
 });
 
-/**
- * původní kód z yt. Po dokončení můžeš smazat
- */
-app.post('/upload', (req,res)=>{
-    if(!req.files){
-        return res.status(400).send('No files were uploaded');
-    }
-
-    let sampleFile = req.files.sampleFile;
-    let uploadPath = __dirname + '/uploads/' + sampleFile.name;
-    sampleFile.mv(uploadPath, function (err) {
-        if (err) {
-            return res.status(500).send(err);
-        }
-        client.upload({
-            image: fs.createReadStream(uploadPath),
-            type: "stream"
-        }).then((response) => {
-            fs.unlinkSync(uploadPath);
-            imgurImageLink = response.data.link;
-            res.render('uploaded.ejs', {link: response.data.link});
-            console.log(response.data.link);
-
-        })
-
-    }).then()
-});
 
 /**
  *
@@ -61,8 +27,13 @@ app.post('/upload', (req,res)=>{
  * @returns Promise: when succesfull link to Imgur of the image, either undefined
  */
 async function promiseImgur(req) {
+    const { ImgurClient } = require('imgur');
+
+    const client = new ImgurClient({ clientId: process.env.IMGUR_CLIENT_ID });
+
     if(req.body.imgur && !req.files  ){
-        return Promise.reject(new Error('The user did not entered a file'));
+        console.log('The user did not entered a file');
+        return Promise.resolve('The user did not entered a file');
     }
     if(!req.body.imgur){
         return Promise.resolve(undefined);
@@ -79,7 +50,6 @@ async function promiseImgur(req) {
                     image: fs.createReadStream(imagePath),
                     type: "stream"
                 });
-                fs.unlinkSync(imagePath);
                 console.log('Imgur link: '+response.data.link)
                 resolve(response.data.link);
             } catch (error) {
@@ -111,7 +81,7 @@ async function promiseReddit(req) {
         return Promise.resolve(undefined);
     }
     if (!req.body.title) {
-        return Promise.reject(new Error('The user did not entered a title'));
+        return Promise.resolve('The user did not entered a title');
     }
     const r = new snoowrap({
         userAgent: 'put your user-agent string here',
@@ -147,37 +117,68 @@ function createTwitterLink(id){
  * @returns Promise link to tweet
  */
 async function promiseTwitter(req){
-
     if (!req.body.twitter) {
         return Promise.resolve(undefined);
     }
-    if (!req.body.textPost) {
+    if (!req.body.textPost && !req.files) {
         return Promise.resolve(undefined);
     }
-    let myHeaders = new Headers();
-    myHeaders.append("Authorization", 'OAuth oauth_consumer_key="'
-        + process.env.TWITTER_API_KEY + '",oauth_token="'
-        + process.env.TWITTER_ACCESS_TOKEN + '",oauth_signature_method="HMAC-SHA1",oauth_timestamp="1673884596",oauth_nonce="fl8ncgGvl3e",oauth_version="1.0",oauth_signature="9Ur35X%2Fenk46SUnWP3DQHNiQmfE%3D    "');
-    myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Cookie", "guest_id=v1%3A167388459685919437");
-    let raw = JSON.stringify({
-        "text": req.body.textPost
-    });
+    const Twit = require('twit');
+    const T = new Twit({
+        consumer_key:         process.env.TWITTER_API_KEY,
+        consumer_secret:      process.env.TWITTER_KEY_SECRET,
+        access_token:         process.env.TWITTER_ACCESS_TOKEN,
+        access_token_secret:  process.env.TWITTER_TOKEN_SECRET,
+        timeout_ms:           60*1000,  // optional HTTP request timeout to apply to all requests.
+        strictSSL:            true,     // optional - requires SSL certificates to be valid.
+    })
 
-    const requestOptions = {
-        method: 'POST',
-        headers: myHeaders,
-        body: raw,
-        redirect: 'follow'
-    };
-    return await fetch("https://api.twitter.com/2/tweets", requestOptions)
-        .then(response => response.text())
-        .then(response => {
-            let jsonResponse = JSON.parse(response);
-            console.log('Twitter link: '+createTwitterLink(jsonResponse.data.id));
-            return createTwitterLink(jsonResponse.data.id);
+    if(!req.files) {
+        return new Promise((resolve, reject) => {
+            T.post('statuses/update', {status: req.body.textPost}, function (err, data, response) {
+                console.log(createTwitterLink(data.id_str));
+                resolve(createTwitterLink(data.id_str));
+            });
         })
-        .catch(error => console.log('error', error));
+    }
+    //At this point we know that the user wants to post an image with a text
+    return new Promise((resolve, reject) =>{
+        image = req.files.image;
+        imagePath = __dirname + '/uploads/' + image.name;
+        image.mv(imagePath, async function (err) {
+            if (err) {
+                console.log(err);
+                return reject(err);
+            }
+            const b64content = fs.readFileSync(imagePath, { encoding: 'base64' });
+            // first we must post the media to Twitter
+            T.post('media/upload', { media_data: b64content }, function (err, data, response) {
+                // now we can assign alt text to the media, for use by screen readers and
+                // other text-based presentations and interpreters
+                const mediaIdStr = data.media_id_string;
+                const meta_params = {media_id: mediaIdStr, alt_text: {text: req.body.textPost}};
+                T.post('media/metadata/create', meta_params, function (err, data, response) {
+                    if (!err) {
+                        // now we can reference the media and post a tweet (media will attach to the tweet)
+                        const params = { status: req.body.textPost, media_ids: [mediaIdStr] }
+
+                        T.post('statuses/update', params, function (err, data, response) {
+                            console.log(createTwitterLink(data.id_str));
+                            resolve(createTwitterLink(data.id_str));
+                        })
+                    }
+                })
+        })
+    })
+
+
+
+
+    })
+}
+
+function deleteImageFromServer(image) {
+    fs.unlinkSync(imagePath = __dirname + '/uploads/' + image.name);
 }
 
 /*  Jestli jsou sociální sítě vybrány pošle se jejich jméno do req.body.<NÁZEV SOCIÁLNÍ SÍTĚ>
@@ -189,37 +190,20 @@ async function promiseTwitter(req){
 app.post('/submit-form', (req,res) => {
     Promise.all([promiseImgur(req),promiseReddit(req), promiseTwitter(req)])
         .then(([imgurData, redditData, twitterData]) =>{
-            res.render('uploaded.ejs', {imgurLink: imgurData, redditLink: redditData, twitterLink: twitterData});
+            if(req.files){
+                deleteImageFromServer(req.files.image);
+            }
+            let body = {};
+            if(twitterData)
+                body.twitterLink = twitterData;
+            if(redditData)
+                body.redditLink = redditData;
+            if(imgurData)
+                body.imgurLink = imgurData;
+            console.log(body);
+            res.send(body);
         })
-    if(!req.files){
-        return res.status(400).send('Nothing was uploaded');
-    }
-
-    image = req.files.image;
-    imagePath = __dirname + '/uploads/' + image.name;
-    image.mv(imagePath, function(err) {
-        if (err) {
-            return res.status(500).send(err);
-        }
-        if(req.body.imgur){
-            client.upload({
-                image: fs.createReadStream(imagePath),
-                type: "stream"
-            }).then((response) => {
-                //TODO upravit
-                fs.unlinkSync(imagePath);
-                res.render('uploaded.ejs', {link: response.data.link});
-                console.log(response.data.link);
-
-            }).then(()=>{
-            })
-        }
-
-        res.send('File uploaded to ' + imagePath);
-        console.log('File uploaded to ' + imagePath);
-    });
-
-})
+});
 
 app.listen(3000, ()=>{
     console.log('Server started on port 3000');

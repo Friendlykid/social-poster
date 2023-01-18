@@ -13,25 +13,19 @@
 
 <body style="background: darkgrey">
     <h1>Social poster</h1>
-    <h2>Welcome!</h2>
-    <h3>Choose on which social networks you want to upload your post</h3>
+    <h2>Choose on which social networks you want to upload your post</h2>
     <div class="checkboxes">
         <div class="checkboxClass">
-            <i class='fa fa-twitter' style='color: blue'></i>
+            <i class='fa fa-twitter' style='color: blue' ></i>
             <label for="twitter">Twitter</label>
             <input type="checkbox" id="twitter" class="box">
-        </div>
-        <div class="checkboxClass">
-            <i class='fa fa-instagram' style='color: red'></i>
-            <label for="instagram">Instagram</label>
-            <input type="checkbox" id="instagram" class="box">
         </div>
         <div class="checkboxClass" >
             <i class='fa fa-reddit' style='color: red'></i>
             <label for="reddit">Reddit</label>
             <input type="checkbox" id="reddit" class="box">
         </div>
-        <div class="checkboxClass" onclick="showSelectImage()">
+        <div class="checkboxClass" >
             <img src="https://esotemp.vse.cz/~kouj13/public_style/imgur_logo.png" alt="logoImgur" style="height: 16px">
             <label for="imgur">Imgur</label>
             <input type="checkbox" id="imgur" class="box">
@@ -62,13 +56,16 @@
     <input type="file" style="display: none" accept="image/*" id="image" placeholder="Image">
     <br>
     <button class="buttonUpload" id="buttonUpload" onclick="uploadPosts()">Upload</button>
-    <div class="center" id="url"></div>
+    <div class="center" id="url">
+        <p>Imgur link: <a id="imgurLink" style="visibility: hidden" target="_blank"></a></p>
+        <p>Reddit link:<a id="redditLink" style="visibility: hidden" target="_blank"></a></p>
+        <p>Twitter link:<a id="twitterLink" style="visibility: hidden" target="_blank"></a></p>
+    </div>
     <script>
 
-        function showSelectImage(){
-            if(document.getElementById('imageLabel').style.visibility !== 'visible'){
+        function imageInputClick(){
+            if(document.getElementById('imgur').checked || document.getElementById('twitter').checked ){
                 document.getElementById('imageLabel').style.visibility = 'visible';
-
             } else{
                 document.getElementById('imageLabel').style.visibility = 'hidden';
                 document.getElementById('image').value = '';
@@ -79,6 +76,9 @@
             checkboxContainer.addEventListener('click', (e) => {
                 let box = checkboxContainer.getElementsByClassName("box")[0];
                 box.checked = !box.checked;
+                if(box.id === 'twitter' || box.id === 'imgur'){
+                    imageInputClick();
+                }
                 if(box.checked){
                     checkboxContainer.style.backgroundColor = "#2d63c8";
                 }
@@ -151,7 +151,32 @@
                 fetch('http://localhost:3000/submit-form', {
                     method: 'POST',
                     body: formData
-                });
+                }).then(res => {
+                    if(res.ok) {
+                        return res.json();
+                    }
+                    else {
+                        throw new Error('Server responded with status: ' + res.status);
+                    }
+                })
+                    .then(data => {
+                        console.log(data);
+                        if(data.imgurLink){
+                            document.getElementById('imgurLink').style.visibility = 'visible';
+                            document.getElementById('imgurLink').innerHTML = data.imgurLink;
+                            document.getElementById('imgurLink').href = data.imgurLink;
+                        }
+                        if(data.redditLink){
+                            document.getElementById('redditLink').style.visibility = 'visible';
+                            document.getElementById('redditLink').innerHTML = data.redditLink;
+                            document.getElementById('redditLink').href = data.redditLink;
+                        }
+                        if(data.twitterLink){
+                            document.getElementById('twitterLink').style.visibility = 'visible';
+                            document.getElementById('twitterLink').innerHTML = data.twitterLink;
+                            document.getElementById('twitterLink').href = data.twitterLink;
+                        }
+                    })
             }
 
         }

@@ -18,6 +18,6 @@
     "snoowrap": "^1.23.0",
     "snoowrap-native": "^1.2.0",
     "tslib": "^2.4.1",
-    "twitter": "^1.7.1"
+    "twit": "^2.2.11"
   }
 }
