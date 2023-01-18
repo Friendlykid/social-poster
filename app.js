@@ -1,4 +1,3 @@
-//Obecný věci
 const fs = require('fs');
 const express = require('express');
 const app = express();
@@ -88,16 +87,21 @@ async function promiseReddit(req) {
         clientSecret: process.env.REDDIT_CLIENT_SECRET,
         refreshToken: process.env.REDDIT_REFRESH_TOKEN
     });
-    return new Promise((resolve, reject)=>{
+    let check;
+    return new Promise((resolve)=>{
         r.submitSelfpost({
             subredditName: req.body.subreddit,
             title: req.body.title,
             text: req.body.textPost
+        }).catch(() =>{
+            check = true;
         }).then((r) =>{
-            console.log('Reddit link: '+createRedditLink(r.name,req.body.subreddit));
-            resolve(createRedditLink(r.name,req.body.subreddit));
-        }).catch((err) =>{
-            reject(err);
+            if(check){
+                resolve('Invalid subreddit');
+            }else{
+                console.log('Reddit link: '+createRedditLink(r.name,req.body.subreddit));
+                resolve(createRedditLink(r.name,req.body.subreddit));
+            }
         })
     })
 }
@@ -122,6 +126,9 @@ async function promiseTwitter(req){
     if (!req.body.textPost && !req.files) {
         return Promise.resolve(undefined);
     }
+    if (!req.body.textPost && req.files) {
+        return Promise.resolve('You have to enter a text');
+    }
     const Twit = require('twit');
     const T = new Twit({
         consumer_key:         process.env.TWITTER_API_KEY,
@@ -133,8 +140,8 @@ async function promiseTwitter(req){
     })
 
     if(!req.files) {
-        return new Promise((resolve, reject) => {
-            T.post('statuses/update', {status: req.body.textPost}, function (err, data, response) {
+        return new Promise((resolve) => {
+            T.post('statuses/update', {status: req.body.textPost}, function (err, data) {
                 console.log(createTwitterLink(data.id_str));
                 resolve(createTwitterLink(data.id_str));
             });
@@ -151,40 +158,44 @@ async function promiseTwitter(req){
             }
             const b64content = fs.readFileSync(imagePath, { encoding: 'base64' });
             // first we must post the media to Twitter
-            T.post('media/upload', { media_data: b64content }, function (err, data, response) {
+            T.post('media/upload', { media_data: b64content }, function (err, data) {
                 // now we can assign alt text to the media, for use by screen readers and
                 // other text-based presentations and interpreters
                 const mediaIdStr = data.media_id_string;
                 const meta_params = {media_id: mediaIdStr, alt_text: {text: req.body.textPost}};
-                T.post('media/metadata/create', meta_params, function (err, data, response) {
+                T.post('media/metadata/create', meta_params, function (err) {
                     if (!err) {
                         // now we can reference the media and post a tweet (media will attach to the tweet)
-                        const params = { status: req.body.textPost, media_ids: [mediaIdStr] }
+                        let status = req.body.textPost;
+                        if(!req.body.textPost)
+                            status = ' ';
+                        const params = { status: status, media_ids: [mediaIdStr] }
 
-                        T.post('statuses/update', params, function (err, data, response) {
+                        T.post('statuses/update', params, function (err, data) {
                             console.log(createTwitterLink(data.id_str));
                             resolve(createTwitterLink(data.id_str));
                         })
                     }
                 })
+            })
         })
-    })
-
-
-
-
     })
 }
 
 function deleteImageFromServer(image) {
-    fs.unlinkSync(imagePath = __dirname + '/uploads/' + image.name);
+    try{
+        fs.unlinkSync(imagePath = __dirname + '/uploads/' + image.name);
+    }catch (e){
+        console.log(e);
+    }
+
 }
 
-/*  Jestli jsou sociální sítě vybrány pošle se jejich jméno do req.body.<NÁZEV SOCIÁLNÍ SÍTĚ>
-    req.body.title je title příspěvku
-    req.body.subreddit je jméno subreditu
-    req.body.textPost je text příspěvku
-    req.files.image je obrázek
+/*  If is website chosen its name will appear in req.body.<NAME OF WEBSITE>
+    req.body.title is title
+    req.body.subreddit is name of subreddit
+    req.body.textPost is text
+    req.files.image is image
 */
 app.post('/submit-form', (req,res) => {
     Promise.all([promiseImgur(req),promiseReddit(req), promiseTwitter(req)])
